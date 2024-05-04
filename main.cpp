@@ -9,21 +9,29 @@
 #include <format>
 
 using namespace std;
+
+
+// Function prototypes
+void enterPaymentInformation();
+bool validateCardNumber(const std::string& cardNumber);
+bool validateCVV(const std::string& cvv);
+
+
 // Show List of Restaurants
 void queryRestaurants(sql::Connection *con, const string&cuisine = "") {
     try {
         sql::Statement* stmt = con->createStatement();
         sql::ResultSet* res;
         if (cuisine.empty()) {
-            res = stmt->executeQuery("SELECT idrestaurant,RestaurantName,RestaurantAddress FROM restaurant");
+            res = stmt->executeQuery("SELECT idrestaurant,RestaurantName,RestaurantAddress,RestaurantRating FROM restaurant");
         }
         else {
-            res = stmt->executeQuery("SELECT idrestaurant,RestaurantName,RestaurantAddress FROM restaurant WHERE RestaurantCuisine = '" + cuisine + "'");
+            res = stmt->executeQuery("SELECT idrestaurant,RestaurantName,RestaurantAddress,RestaurantRating FROM restaurant WHERE RestaurantCuisine = '" + cuisine + "'");
         }
 
         cout << "Restaurants:" << endl;
         while (res->next()) {
-            cout << res->getInt("idrestaurant")<<":" << res->getString("RestaurantName") << "\n" << "Address: " << res->getString("RestaurantAddress") << "\n" << endl;
+            cout << res->getInt("idrestaurant")<<":" << res->getString("RestaurantName") << "\n" << "Address: " << res->getString("RestaurantAddress") << "\n" << "Rating: " << res->getDouble("RestaurantRating") <<"\n" << endl;
         }
 
         delete res;
@@ -199,12 +207,13 @@ void DisplayPeiWeiMenu(sql::Connection* con) {
 }
 
 
-
+//main menu function
 void MainMenu() {
 
     cout << "Welcome to Hunger Mate" << "\n";
     cout << "1: Order" << "\n";    
-    cout << "2: Exit" << "\n";
+    cout << "2: Leave Rating" << "\n";
+    cout << "3: Exit" << "\n";
     cout << "Enter Choice: ";
 
 }
@@ -223,6 +232,100 @@ void FilterRestaurantMenu()
 
 }
 
+
+//Payment information function
+void enterPaymentInformation() {
+    std::string paymentMethod;
+    std::string cardNumber;
+    std::string expiryDate;
+    std::string cvv;
+
+    std::cout << "Select Payment Method (credit_card, debit_card, paypal): ";
+    std::cin >> paymentMethod;
+
+    if (paymentMethod == "paypal") {
+        std::cout << "PayPal Selected\n";
+        return;
+    }
+
+    std::cout << "Enter Card Number: ";
+    std::cin >> cardNumber;
+    while (!validateCardNumber(cardNumber)) {
+        std::cout << "Invalid Card Number, try again: ";
+        std::cin >> cardNumber;
+    }
+
+    std::cout << "Enter Expiry Date (MM/YYYY): ";
+    std::cin >> expiryDate;
+
+    std::cout << "Enter CVV: ";
+    std::cin >> cvv;
+    while (!validateCVV(cvv)) {
+        std::cout << "Invalid CVV, try again: ";
+        std::cin >> cvv;
+    }
+
+    std::cout << "Payment information received successfully.\n";
+
+}
+//validate card number
+bool validateCardNumber(const std::string& cardNumber) {
+    // Basic validation: ensure only digits are entered and the length is between 13 and 16
+    return cardNumber.length() >= 13 && cardNumber.length() <= 16 && cardNumber.find_first_not_of("0123456789") == std::string::npos;
+}
+//validate CVV
+bool validateCVV(const std::string& cvv) {
+    // CVV validation: should be exactly 3 or 4 digits
+    return (cvv.length() == 3 || cvv.length() == 4) && cvv.find_first_not_of("0123456789") == std::string::npos;
+}
+//pickup function
+void Pickup()
+{
+    string name;
+    cout << "What is your Name? : ";
+    cin >> name;
+    enterPaymentInformation();
+
+}
+//delivery function
+void Delivery(sql::Connection* con, double& totalPrice)
+{
+    string customername;
+    string address;
+    string city;
+    string state;
+    int zipcode;
+    cout << "Enter Name: \n";
+    std::getline(std::cin, customername);
+    cout << "Enter Address: \n";
+    std::getline(std::cin, address);
+    cout << "Enter City: \n";
+    std::getline(std::cin, city);
+    cout << "Enter State: \n";
+    std::getline(std::cin, state);
+    cout << "Enter Zip Code: ";
+    cin >> zipcode;
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    enterPaymentInformation();
+    
+ 
+    try {
+        sql::Statement* stmt = con->createStatement();
+        sql::ResultSet* res;
+
+        stmt->executeUpdate("INSERT INTO `customerorders` (CustomerName,CustomerAddress,CustomerCity,CustomerState,ZipCode,TotalPrice) VALUES ('" + customername + "','" +  address + "','" + city + "','" + state + "','" + to_string(zipcode) + "','" + to_string(totalPrice) + "');");
+
+
+
+       
+        delete stmt;
+    }
+        catch (sql::SQLException& e) {
+            cout << "SQL Exception: " << e.what() << endl;
+        }
+   
+}
+
 //customize items function
 std::vector<string> customizeOrder(std::vector<string> cart) {
     std::vector<std::string> customizations;
@@ -238,8 +341,9 @@ std::vector<string> customizeOrder(std::vector<string> cart) {
 
     return customizations;
 }
+
 //adding item to cart function
-void addItemToCart(sql::Connection* con,std::vector<string>& cart, std::vector<string>foodItems, const std::string& tableName) {
+double addItemToCart(sql::Connection* con, std::vector<string>& cart, std::vector<string>foodItems, const std::string& tableName, double& totalPrice) {
     foodItems.clear();
     int choice;
     std::cout << "Enter the number of the item you want to add to your cart: ";
@@ -253,7 +357,7 @@ void addItemToCart(sql::Connection* con,std::vector<string>& cart, std::vector<s
         res = stmt->executeQuery(query);
 
 
-        
+
         while (res->next()) {
             foodItems.push_back(res->getString("item_name"));
         }
@@ -267,26 +371,90 @@ void addItemToCart(sql::Connection* con,std::vector<string>& cart, std::vector<s
 
     // Check for valid input
     if (choice > 0 && choice <= foodItems.size()) {
+        sql::Statement* stmt = con->createStatement();
+        sql::ResultSet* res;
+
+        // Get the item price from the database
+        std::string query = "SELECT item_price FROM " + tableName + " WHERE item_name = '" + foodItems[choice - 1] + "'";
+        res = stmt->executeQuery(query);
+        res->next();
+        double itemPrice = res->getDouble("item_price");
+
+        // Add the item to the cart and update the total price
         cart.push_back(foodItems[choice - 1]);
+        totalPrice += itemPrice;
         std::cout << foodItems[choice - 1] << " added to your cart.\n";
+        delete res;
+        delete stmt;
+        return itemPrice;
     }
     else {
         std::cout << "Invalid item number. Please try again.\n";
+        return 0.0; // Return 0 if no item was added
     }
-    
-    
+
+
 }
 
 
+//user input rating function
+double GetRatingFromUser() {
+    double newRating;
+    cout << "Enter a rating for this restaurant (1-5): ";
+    cin >> newRating;
+    // Add input validation 
+    return newRating;
+}
+//restaurant review function
+void RestaurantReview(sql::Connection* con, int restaurantId, double newRating) {
+    try {
+        sql::Statement* stmt = con->createStatement();
+        sql::ResultSet* res;
+
+        // Get the current rating and number of ratings
+        res = stmt->executeQuery("SELECT RestaurantRating, num_ratings FROM restaurant WHERE idrestaurant = " + to_string(restaurantId));
+        res->next();
+        double currentRating = res->getDouble("RestaurantRating");
+        int numRatings = res->getInt("num_ratings");
+
+        // Calculate the new average rating
+        double updatedRating = (currentRating * numRatings + newRating) / (numRatings + 1);
+        numRatings++;
+
+        // Update the database with the new rating
+        stmt->execute("UPDATE restaurant SET RestaurantRating = " + to_string(updatedRating) + ", num_ratings = " + to_string(numRatings) + " WHERE idrestaurant = " + to_string(restaurantId));
+
+        cout << "Thank you for your review!" << endl;
+
+        delete res;
+        delete stmt;
+    }
+    catch (sql::SQLException& e) {
+        cout << "SQL Exception: " << e.what() << endl;
+    }
+}
+
+
+
+//main function
 int main()
 {   //MySQL Connector Setup
     sql::Driver* driver = get_driver_instance();
     sql::Connection* con = driver->connect("tcp://localhost:3306", "root", "root");
     con->setSchema("hungermate");
-
+    //variables
     int choice;
     int restaurantChoice;
+    int restaurantId;
     string cuisine;
+    string pickupordelivery;
+    string address;
+    string city;
+    string state;
+    string zipcode;
+    double rating;
+    double totalPrice = 0.0;
+    
     
     //vectors storing the data that will be sent to database
     std::vector<std::string> foodItems;
@@ -298,14 +466,14 @@ int main()
     do {
         MainMenu();
         cin >> choice; 
-        cin.ignore(); // Clear the input buffer
+        cin.ignore(); 
 
         switch (choice) {
         case 1:
             do {
                 FilterRestaurantMenu();
                 cin >> choice;
-                cin.ignore(); // Clear the input buffer
+                cin.ignore(); 
 
                 switch (choice) {
                 case 1:
@@ -320,17 +488,33 @@ int main()
                         char continueShopping = 'y';
                         DisplayMcDonaldsMenu(con);
                         while (continueShopping == 'y' || continueShopping == 'Y') {
-                            addItemToCart(con,cart, foodItems,"mcdonaldsmenu");
-                            //customizeOrder(cart);
+                            addItemToCart(con,cart, foodItems,"mcdonaldsmenu",totalPrice);
+                            std::cout << "Total Price: $" << totalPrice << "\n";
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
-                            std::cin >> continueShopping;
+                            cin >> continueShopping;
                         }
                         customizeOrder(cart);
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
                         }
-                        
+                        cout << "Delivery or Pickup?";
+                        std::getline(std::cin, pickupordelivery);
+                             if (pickupordelivery == "Pickup")
+                             {
+                             
+                                 Pickup();
+                                 
+                             }
+                             else if (pickupordelivery == "Delivery")
+                             {
+                                 Delivery(con,totalPrice);
+                             }
+                             else 
+                             {
+                                 cout << "Invalid Selection";
+                             }
+                             
                     }
 
                     if (restaurantChoice == 2)
@@ -338,8 +522,8 @@ int main()
                         char continueShopping = 'y';
                         DisplayRaisingCanesMenu(con);
                         while (continueShopping == 'y' || continueShopping == 'Y') {
-                            addItemToCart(con, cart, foodItems, "raisingcanesmenu");
-                           
+                            addItemToCart(con, cart, foodItems, "raisingcanesmenu",totalPrice);
+                            std::cout << "Total Price: $" << totalPrice << "\n";
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
@@ -347,6 +531,22 @@ int main()
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
+                        }
+                        cout << "Delivery or Pickup?";
+                        std::getline(std::cin, pickupordelivery);
+                        if (pickupordelivery == "Pickup")
+                        {
+
+                            Pickup();
+
+                        }
+                        else if (pickupordelivery == "Delivery")
+                        {
+                            Delivery(con,totalPrice);
+                        }
+                        else
+                        {
+                            cout << "Invalid Selection";
                         }
                     }
                     break;
@@ -361,7 +561,7 @@ int main()
                         char continueShopping = 'y';
                         DisplayTacoBellMenu(con);
                         while (continueShopping == 'y' || continueShopping == 'Y') {
-                            addItemToCart(con, cart, foodItems, "tacobellmenu");
+                            addItemToCart(con, cart, foodItems,"tacobellmenu",totalPrice);
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
@@ -370,6 +570,23 @@ int main()
                         for (const string& item : cart) {
                             cout << item << endl;
                         }
+                        cout << "Delivery or Pickup?";
+                        std::getline(std::cin, pickupordelivery);
+                        if (pickupordelivery == "Pickup")
+                        {
+
+                            Pickup();
+
+                        }
+                        else if (pickupordelivery == "Delivery")
+                        {
+                            Delivery(con,totalPrice);
+                        }
+                        else
+                        {
+                            cout << "Invalid Selection";
+                        }
+
 
                     }
                     if (restaurantChoice == 4)
@@ -377,7 +594,7 @@ int main()
                         char continueShopping = 'y';
                         DisplayTacoCabanaMenu(con);
                         while (continueShopping == 'y' || continueShopping == 'Y') {
-                            addItemToCart(con, cart, foodItems, "tacocabanamenu");
+                            addItemToCart(con, cart, foodItems,"tacocabanamenu",totalPrice);
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
@@ -385,6 +602,22 @@ int main()
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
+                        }
+                        cout << "Delivery or Pickup?";
+                        std::getline(std::cin, pickupordelivery);
+                        if (pickupordelivery == "Pickup")
+                        {
+
+                            Pickup();
+
+                        }
+                        else if (pickupordelivery == "Delivery")
+                        {
+                            Delivery(con,totalPrice);
+                        }
+                        else
+                        {
+                            cout << "Invalid Selection";
                         }
 
                     }
@@ -400,8 +633,7 @@ int main()
                         char continueShopping = 'y';
                         DisplayPandaExpressMenu(con);
                         while (continueShopping == 'y' || continueShopping == 'Y') {
-                            addItemToCart(con, cart, foodItems, "pandaexpressmenu");
-                            //customizeOrder(cart);
+                            addItemToCart(con, cart, foodItems,"pandaexpressmenu",totalPrice);
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
@@ -409,6 +641,22 @@ int main()
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
+                        }
+                        cout << "Delivery or Pickup?";
+                        std::getline(std::cin, pickupordelivery);
+                        if (pickupordelivery == "Pickup")
+                        {
+
+                            Pickup();
+
+                        }
+                        else if (pickupordelivery == "Delivery")
+                        {
+                            Delivery(con,totalPrice);
+                        }
+                        else
+                        {
+                            cout << "Invalid Selection";
                         }
 
                     }
@@ -418,8 +666,7 @@ int main()
                         char continueShopping = 'y';
                         DisplayPeiWeiMenu(con);
                         while (continueShopping == 'y' || continueShopping == 'Y') {
-                            addItemToCart(con, cart, foodItems, "peiweimenu");
-                            //customizeOrder(cart);
+                            addItemToCart(con, cart, foodItems,"peiweimenu",totalPrice);
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
@@ -427,6 +674,22 @@ int main()
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
+                        }
+                        cout << "Delivery or Pickup?";
+                        std::getline(std::cin, pickupordelivery);
+                        if (pickupordelivery == "Pickup")
+                        {
+
+                            Pickup();
+
+                        }
+                        else if (pickupordelivery == "Delivery")
+                        {
+                            Delivery(con,totalPrice);
+                        }
+                        else
+                        {
+                            cout << "Invalid Selection";
                         }
 
                     }
@@ -446,13 +709,23 @@ int main()
             break;
        
         case 2:
+            
+            cuisine = "";
+            queryRestaurants(con,cuisine);
+            cout << "Which restaurant do you want to leave a rating?";
+            cin >> restaurantId;
+            rating = GetRatingFromUser();
+            RestaurantReview(con,restaurantId,rating);
+            break;
+        case 3:
             cout << "Exiting program..." << endl;
             break;
+        
         default:
             cout << "Invalid choice. Please try again." << endl;
             break;
         }
-    } while (choice != 2);
+    } while (choice != 3);
 
     delete con;
 
