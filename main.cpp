@@ -12,7 +12,7 @@ using namespace std;
 
 
 // Function prototypes
-void enterPaymentInformation();
+void enterPaymentInformation(string& paymentMethod);
 bool validateCardNumber(const std::string& cardNumber);
 bool validateCVV(const std::string& cvv);
 void printOrder(std::vector<string>, std::vector<double>);
@@ -237,8 +237,8 @@ void FilterRestaurantMenu()
 
 
 //Payment information function
-void enterPaymentInformation() {
-    std::string paymentMethod;
+void enterPaymentInformation(string& paymentMethod) {
+   // std::string paymentMethod;
     std::string cardNumber;
     std::string expiryDate;
     std::string cvv;
@@ -282,14 +282,14 @@ bool validateCVV(const std::string& cvv) {
     return (cvv.length() == 3 || cvv.length() == 4) && cvv.find_first_not_of("0123456789") == std::string::npos;
 }
 //pickup function
-void Pickup(sql::Connection* con, double& totalPrice, std::vector<string>& cart, std::vector<string>& customizations, string& pickupordelivery, std::vector<double>& itemPrices, std::vector<string>& restaurantChoices)
+void Pickup(sql::Connection* con, double& totalPrice, std::vector<string>& cart, std::vector<string>& customizations, string& pickupordelivery, std::vector<double>& itemPrices, std::vector<string>& restaurantChoices,string& paymentMethod)
 {
     string customername;
     cout << "Enter Name: \n";
     std::getline(std::cin, customername);
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     printOrder(cart, itemPrices);
-    enterPaymentInformation();
+    enterPaymentInformation(paymentMethod);
 
 
     try {
@@ -336,7 +336,7 @@ void Pickup(sql::Connection* con, double& totalPrice, std::vector<string>& cart,
             Restaurants.pop_back(); // Remove the trailing comma
         }
 
-        stmt->executeUpdate("INSERT INTO `customerorders` (CustomerName,Restaurants,Items,Customizations,DeliveryChoice,TotalPrice) VALUES ('" + customername + "','" + Restaurants + "','" + cartItems + "','" + customizationItems + "','" + pickupordelivery + "','"  + to_string(totalPrice) + "');");
+        stmt->executeUpdate("INSERT INTO `customerorders` (CustomerName,Restaurants,Items,Customizations,DeliveryChoice,TotalPrice,PaymentMethod) VALUES ('" + customername + "','" + Restaurants + "','" + cartItems + "','" + customizationItems + "','" + pickupordelivery + "','"  + to_string(totalPrice) + "','" + paymentMethod+ "');");
 
 
 
@@ -349,7 +349,7 @@ void Pickup(sql::Connection* con, double& totalPrice, std::vector<string>& cart,
 
 }
 //delivery function
-void Delivery(sql::Connection* con, double& totalPrice, std::vector<string>& cart, std::vector<string>& customizations,string& pickupordelivery, std::vector<double>& itemPrices,std::vector<string>& restaurantChoices)
+void Delivery(sql::Connection* con, double& totalPrice, std::vector<string>& cart, std::vector<string>& customizations,string& pickupordelivery, std::vector<double>& itemPrices,std::vector<string>& restaurantChoices, string& paymentMethod)
 {
     string customername;
     string address;
@@ -368,9 +368,9 @@ void Delivery(sql::Connection* con, double& totalPrice, std::vector<string>& car
     cin >> zipcode;
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     printOrder(cart,itemPrices);
-    enterPaymentInformation();
+    enterPaymentInformation(paymentMethod);
     
- 
+
     try {
         sql::Statement* stmt = con->createStatement();
         sql::ResultSet* res;
@@ -415,7 +415,7 @@ void Delivery(sql::Connection* con, double& totalPrice, std::vector<string>& car
             Restaurants.pop_back(); // Remove the trailing comma
         }
 
-        stmt->executeUpdate("INSERT INTO `customerorders` (CustomerName,Restaurants,Items,Customizations,DeliveryChoice,CustomerAddress,CustomerCity,CustomerState,ZipCode,TotalPrice) VALUES ('" + customername +"','"+Restaurants+ "','" + cartItems+ "','" + customizationItems +"','"+ pickupordelivery +"','" +  address + "','" + city + "','" + state + "','" + to_string(zipcode) + "','" + to_string(totalPrice) + "');");
+        stmt->executeUpdate("INSERT INTO `customerorders` (CustomerName,Restaurants,Items,Customizations,DeliveryChoice,CustomerAddress,CustomerCity,CustomerState,ZipCode,TotalPrice,PaymentMethod) VALUES ('" + customername +"','"+Restaurants+ "','" + cartItems+ "','" + customizationItems +"','"+ pickupordelivery +"','" +  address + "','" + city + "','" + state + "','" + to_string(zipcode) + "','" + to_string(totalPrice) + "','" + paymentMethod+ "');");
 
 
 
@@ -429,19 +429,20 @@ void Delivery(sql::Connection* con, double& totalPrice, std::vector<string>& car
 }
 
 //customize items function
-std::vector<string> customizeOrder(std::vector<string> cart) {
-    std::vector<std::string> customizations;
+void customizeOrder(std::vector<string>& cart, std::vector<string>& customizations) {
+    //std::vector<std::string> customizations;
     std::string input;
 
 
     for (const std::string& str : cart) {
         cout << "Enter any Customizations for " << str << ":" << "\n";
+        std::cin.ignore(); // Consume the newline character
         std::getline(std::cin, input);
         customizations.push_back(input);
 
     }
 
-    return customizations;
+    
 }
 
 //adding item to cart function
@@ -557,6 +558,7 @@ int main()
     con->setSchema("hungermate");
     //variables
     bool mainmenu = false;
+    int mainChoice;
     int choice;
     int restaurantChoice;
     int restaurantId;
@@ -566,6 +568,7 @@ int main()
     string city;
     string state;
     string zipcode;
+    string paymentMethod;
     double rating;
     double totalPrice = 0.0;
     
@@ -579,10 +582,10 @@ int main()
     
     do {
         MainMenu();
-        cin >> choice; 
+        cin >> mainChoice; 
         cin.ignore(); 
 
-        switch (choice) {
+        switch (mainChoice) {
         case 1:
             do {
                 FilterRestaurantMenu();
@@ -612,7 +615,7 @@ int main()
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             cin >> continueShopping;
                         }
-                        customizeOrder(cart);
+                        customizeOrder(cart,customizations);
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -636,7 +639,7 @@ int main()
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart);
+                        customizeOrder(cart,customizations);
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -660,7 +663,7 @@ int main()
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart);
+                        customizeOrder(cart,customizations);
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -680,10 +683,10 @@ int main()
                                 cout << item << endl;
                             }
                             addItemToCart(con, cart, foodItems,"tacocabanamenu",totalPrice,itemPrices);
-std::cout << "Do you want to add more items to your cart? (y/n): ";
+                            std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart);
+                        customizeOrder(cart,customizations);
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -708,7 +711,7 @@ std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart);
+                        customizeOrder(cart,customizations);
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -732,7 +735,7 @@ std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart);
+                        customizeOrder(cart,customizations);
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -755,24 +758,30 @@ std::cout << "Do you want to add more items to your cart? (y/n): ";
                     if (pickupordelivery == "Pickup")
                         {
 
-                            Pickup(con, totalPrice, cart, customizations, pickupordelivery, itemPrices, restaurantChoices);
+                            Pickup(con, totalPrice, cart, customizations, pickupordelivery, itemPrices, restaurantChoices,paymentMethod);
 
                         }
                         else if (pickupordelivery == "Delivery")
                         {
-                            Delivery(con, totalPrice, cart, customizations, pickupordelivery,itemPrices,restaurantChoices);
+                            Delivery(con, totalPrice, cart, customizations, pickupordelivery,itemPrices,restaurantChoices,paymentMethod);
                         }
                         else
                         {
                             cout << "Invalid Selection";
                         }
                     break;
+                case 6:
+                    break;
                 default:
                     cout << "Invalid choice. Please try again." << endl;
                     break;
                 }
-            } while (choice != 6);
-           
+                if (choice == 6) {
+                    break;
+                }
+
+            } while (true);
+            break;
        
         case 2:
             
@@ -791,7 +800,7 @@ std::cout << "Do you want to add more items to your cart? (y/n): ";
             cout << "Invalid choice. Please try again." << endl;
             break;
         }
-    } while (choice != 3);
+    } while (mainChoice != 3);
 
     delete con;
 
