@@ -346,7 +346,7 @@ void Pickup(sql::Connection* con, double& totalPrice, std::vector<string>& cart,
     catch (sql::SQLException& e) {
         cout << "SQL Exception: " << e.what() << endl;
     }
-
+    cout << "THANK YOU FOR YOUR ORDER\n";
 }
 //delivery function
 void Delivery(sql::Connection* con, double& totalPrice, std::vector<string>& cart, std::vector<string>& customizations,string& pickupordelivery, std::vector<double>& itemPrices,std::vector<string>& restaurantChoices, string& paymentMethod)
@@ -425,7 +425,7 @@ void Delivery(sql::Connection* con, double& totalPrice, std::vector<string>& car
         catch (sql::SQLException& e) {
             cout << "SQL Exception: " << e.what() << endl;
         }
-        
+        cout << "THANK YOU FOR YOUR ORDER\n";
 }
 
 //customize items function
@@ -615,7 +615,7 @@ int main()
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             cin >> continueShopping;
                         }
-                        customizeOrder(cart,customizations);
+                    
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -639,7 +639,7 @@ int main()
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart,customizations);
+                     
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -660,10 +660,15 @@ int main()
                         DisplayTacoBellMenu(con);
                         while (continueShopping == 'y' || continueShopping == 'Y') {
                             addItemToCart(con, cart, foodItems,"tacobellmenu",totalPrice,itemPrices);
+                            cout << "Items in your cart:" << endl;
+                            for (const string& item : cart) {
+                                cout << item << endl;
+                            }
+                            std::cout << "Total Price: $" << totalPrice << "\n";
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart,customizations);
+                   
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -683,10 +688,11 @@ int main()
                                 cout << item << endl;
                             }
                             addItemToCart(con, cart, foodItems,"tacocabanamenu",totalPrice,itemPrices);
+                            std::cout << "Total Price: $" << totalPrice << "\n";
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart,customizations);
+                   
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -708,10 +714,15 @@ int main()
                         DisplayPandaExpressMenu(con);
                         while (continueShopping == 'y' || continueShopping == 'Y') {
                             addItemToCart(con, cart, foodItems,"pandaexpressmenu",totalPrice,itemPrices);
+                            cout << "Items in your cart:" << endl;
+                            for (const string& item : cart) {
+                                cout << item << endl;
+                            }
+                            std::cout << "Total Price: $" << totalPrice << "\n";
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart,customizations);
+                    
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -735,7 +746,7 @@ int main()
                             std::cout << "Do you want to add more items to your cart? (y/n): ";
                             std::cin >> continueShopping;
                         }
-                        customizeOrder(cart,customizations);
+                     
                         cout << "Items in your cart:" << endl;
                         for (const string& item : cart) {
                             cout << item << endl;
@@ -752,6 +763,7 @@ int main()
                     break;
                 
                 case 5:
+                    customizeOrder(cart, customizations);
                     cout << "Delivery or Pickup?";
                     std::getline(std::cin, pickupordelivery);
                    
@@ -767,13 +779,13 @@ int main()
                         }
                         else
                         {
-                            cout << "Invalid Selection";
+                            cout << "Invalid Selection\n";
                         }
                     break;
                 case 6:
                     break;
                 default:
-                    cout << "Invalid choice. Please try again." << endl;
+                    cout << "Invalid choice. Please try again.\n" << endl;
                     break;
                 }
                 if (choice == 6) {
